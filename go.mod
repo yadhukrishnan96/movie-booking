@@ -1,6 +1,6 @@
 module github.com/yadhukrishnan96/movie-booking
 
-go 1.26.5
+go 1.27.1
 
 require github.com/go-chi/chi v1.5.5
 
