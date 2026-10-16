@@ -1,2 +1,3 @@
--- Drop an existing tableE movies'
-DROP TABLE movies;
+
+
+DROP TABLE IF EXISTS movies;

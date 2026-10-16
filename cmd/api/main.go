@@ -37,9 +37,8 @@ func run() error {
 
 	}
 	defer database.Close()
-	
-	movieHandler := movie.NewHandler(database)
 
+	movieHandler := movie.NewHandler(database)
 
 	// initiating the server
 	srv := server.NewServer(movieHandler)
