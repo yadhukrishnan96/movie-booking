@@ -1,4 +1,3 @@
-
 package seed
 
 import (
@@ -53,6 +52,10 @@ func Run(db *sql.DB) error {
 		return fmt.Errorf("no screens found in database")
 	}
 
+	if err := seedSeats(ctx, tx, screens); err != nil {
+		return err
+	}
+
 	schedule := buildSchedule(movies, screens, time.Now(), 30)
 
 	for _, show := range schedule {
@@ -83,6 +86,10 @@ func Run(db *sql.DB) error {
 				err,
 			)
 		}
+	}
+
+	if err := seedShowtimeSeats(ctx, tx); err != nil {
+		return err
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -236,4 +243,45 @@ func buildSchedule(
 	}
 
 	return schedule
+}
+
+func seedSeats(ctx context.Context, tx *sql.Tx, screens []screen) error {
+	for _, s := range screens {
+		for row := 0; row < 5; row++ {
+			for col := 1; col <= 10; col++ {
+				seatNumber := fmt.Sprintf("%c%d", 'A'+row, col)
+
+				_, err := tx.ExecContext(ctx, `
+					INSERT INTO seats (screen_id, seat_number)
+					VALUES ($1, $2)
+					ON CONFLICT (screen_id, seat_number) DO NOTHING
+				`, s.ID, seatNumber)
+				if err != nil {
+					return fmt.Errorf(
+						"seeding seat %s for screen %d: %w",
+						seatNumber, s.ID, err,
+					)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+func seedShowtimeSeats(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO showtime_seats (showtime_id, seat_id, status)
+		SELECT
+			st.id,
+			s.id,
+			'available'
+		FROM showtimes st
+		JOIN seats s ON s.screen_id = st.screen_id
+		ON CONFLICT (showtime_id, seat_id) DO NOTHING
+	`)
+	if err != nil {
+		return fmt.Errorf("seeding showtime seats: %w", err)
+	}
+
+	return nil
 }
