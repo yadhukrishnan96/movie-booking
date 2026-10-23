@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/yadhukrishnan96/movie-booking/internal/booking"
 	"github.com/yadhukrishnan96/movie-booking/internal/movie"
 )
 
@@ -11,10 +12,11 @@ type Server struct {
 	httpServer *http.Server
 	router     chi.Router
 
-	movieHandler *movie.Handler
+	movieHandler   *movie.Handler
+	bookingHandler *booking.Handler
 }
 
-func NewServer(movieHandler *movie.Handler) *Server {
+func NewServer(movieHandler *movie.Handler, bookingHandler *booking.Handler) *Server {
 
 	r := chi.NewRouter()
 
@@ -23,8 +25,9 @@ func NewServer(movieHandler *movie.Handler) *Server {
 			Addr:    ":3000",
 			Handler: r,
 		},
-		router:       r,
-		movieHandler: movieHandler,
+		router:         r,
+		movieHandler:   movieHandler,
+		bookingHandler: bookingHandler,
 	}
 }
 
@@ -38,6 +41,11 @@ func (s *Server) Mount() {
 	s.router.Post("/movies", s.movieHandler.CreateMovie)
 	s.router.Delete("/movies/{id}", s.movieHandler.DeleteMovie)
 	s.router.Put("/movies/{id}", s.movieHandler.UpdateMovie)
+
+	s.router.Post(
+		"/showtimes/{showtimeID}/seats/{seatID}/book",
+		s.bookingHandler.BookSeat,
+	)
 
 }
 

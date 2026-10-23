@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/joho/godotenv"
+	"github.com/yadhukrishnan96/movie-booking/internal/booking"
 	"github.com/yadhukrishnan96/movie-booking/internal/db"
 	"github.com/yadhukrishnan96/movie-booking/internal/movie"
 	"github.com/yadhukrishnan96/movie-booking/internal/server"
@@ -40,8 +41,14 @@ func run() error {
 
 	movieHandler := movie.NewHandler(database)
 
+	bookingStore := booking.NewPostgresStore(database)
+
+	bookingService := booking.NewService(bookingStore)
+
+	bookingHandler := booking.NewHandler(bookingService)
+
 	// initiating the server
-	srv := server.NewServer(movieHandler)
+	srv := server.NewServer(movieHandler, bookingHandler)
 
 	srv.Mount()
 
