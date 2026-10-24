@@ -47,6 +47,21 @@ func (s *Server) Mount() {
 		s.bookingHandler.BookSeat,
 	)
 
+	s.router.Post(
+		"/showtimes/{showtimeID}/seats/{seatID}/hold",
+		s.bookingHandler.HoldSeat,
+	)
+
+	s.router.Post(
+		"/showtimes/{showtimeID}/seats/{seatID}/confirm",
+		s.bookingHandler.ConfirmSeat,
+	)
+
+	s.router.Post(
+		"/showtimes/{showtimeID}/seats/{seatID}/release",
+		s.bookingHandler.ReleaseSeat,
+	)
+
 }
 
 func (s *Server) Run() error {
