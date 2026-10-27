@@ -24,10 +24,9 @@ func NewHandler(db *sql.DB) *Handler {
 
 func (h *Handler) UpdateMovie(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("UpdateMovie called")
+
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
-
-	if err != nil {
-
+	if err != nil || id <= 0 {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
@@ -35,7 +34,6 @@ func (h *Handler) UpdateMovie(w http.ResponseWriter, r *http.Request) {
 	var movie Movie
 
 	err = json.NewDecoder(r.Body).Decode(&movie)
-
 	if err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
@@ -46,31 +44,25 @@ func (h *Handler) UpdateMovie(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
-result, err := h.db.Exec(
-		"UPDATE movies SET title = $1 WHERE id = $2",
+	err = h.db.QueryRow(
+		`UPDATE movies
+		 SET title = $1, duration_minutes = $2
+		 WHERE id = $3
+		 RETURNING id, title, duration_minutes`,
 		movie.Title,
+		movie.DurationMinutes,
 		id,
-	)
+	).Scan(&movie.ID, &movie.Title, &movie.DurationMinutes)
+
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+
 		http.Error(w, "failed to update movie", http.StatusInternalServerError)
 		return
 	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		http.Error(w, "failed to check updated movie", http.StatusInternalServerError)
-		return
-	}
-
-	if rowsAffected == 0 {
-		http.NotFound(w, r)
-		return
-	}
-
-	movie.ID = id
-
-	
 
 	utils.WriteJSON(w, http.StatusOK, movie)
 }
@@ -109,23 +101,29 @@ func (h *Handler) DeleteMovie(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateMovie(w http.ResponseWriter, r *http.Request) {
 	var movie Movie
 
-	err := json.NewDecoder(r.Body).Decode(&movie)
-
-	if err != nil {
-		http.Error(w, "invald request body", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&movie); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
+
 	if movie.Title == "" {
 		http.Error(w, "title is required", http.StatusBadRequest)
 		return
-
 	}
 
-	h.db.QueryRow(
-		"INSERT INTO movies (title) VALUES ($1) RETURNING id",
+	err := h.db.QueryRow(
+		`INSERT INTO movies (title)
+		 VALUES ($1)
+		 RETURNING id, title, duration_minutes`,
 		movie.Title,
-	).Scan(&movie.ID)
+	).Scan(&movie.ID, &movie.Title, &movie.DurationMinutes)
 
+	if err != nil {
+		http.Error(w, "failed to create movie", http.StatusInternalServerError)
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusCreated, movie)
 }
 
 func (h *Handler) GetMovie(w http.ResponseWriter, r *http.Request) {
@@ -141,8 +139,8 @@ func (h *Handler) GetMovie(w http.ResponseWriter, r *http.Request) {
 	var movie Movie
 
 	err = h.db.QueryRow(
-		"SELECT id, title FROM movies WHERE id = $1", id,
-	).Scan(&movie.ID, &movie.Title)
+		"SELECT id, title, duration_minutes FROM movies WHERE id = $1", id,
+	).Scan(&movie.ID, &movie.Title, &movie.DurationMinutes)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -161,7 +159,9 @@ func (h *Handler) GetMovie(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListMovies(w http.ResponseWriter, r *http.Request) {
 
-	rows, err := h.db.Query("SELECT id, title FROM movies")
+	rows, err := h.db.Query(
+		"SELECT id, title, duration_minutes FROM movies",
+	)
 
 	if err != nil {
 		http.Error(w, "failed to fetch movies", http.StatusInternalServerError)
@@ -175,8 +175,7 @@ func (h *Handler) ListMovies(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var movie Movie
 
-		err := rows.Scan(&movie.ID, &movie.Title)
-
+		err := rows.Scan(&movie.ID, &movie.Title, &movie.DurationMinutes)
 		if err != nil {
 
 			http.Error(w, "failed to read movie", http.StatusInternalServerError)

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 	"github.com/yadhukrishnan96/movie-booking/internal/booking"
 	"github.com/yadhukrishnan96/movie-booking/internal/movie"
 )
@@ -19,6 +20,23 @@ type Server struct {
 func NewServer(movieHandler *movie.Handler, bookingHandler *booking.Handler) *Server {
 
 	r := chi.NewRouter()
+
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"http://localhost:5173"},
+		AllowedMethods: []string{
+			"GET",
+			"POST",
+			"PUT",
+			"DELETE",
+			"OPTIONS",
+		},
+		AllowedHeaders: []string{
+			"Accept",
+			"Authorization",
+			"Content-Type",
+		},
+		MaxAge: 300,
+	}))
 
 	return &Server{
 		httpServer: &http.Server{
@@ -62,6 +80,12 @@ func (s *Server) Mount() {
 		s.bookingHandler.ReleaseSeat,
 	)
 
+	s.router.Get("/movies/{id}/showtimes", s.movieHandler.ListShowtimes)
+
+	s.router.Get(
+		"/showtimes/{showtimeID}/seats",
+		s.movieHandler.ListShowtimeSeats,
+	)
 }
 
 func (s *Server) Run() error {
