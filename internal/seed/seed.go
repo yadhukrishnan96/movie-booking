@@ -36,6 +36,10 @@ func Run(db *sql.DB) error {
 		return err
 	}
 
+	if err := seedMovies(ctx, tx); err != nil {
+		return err
+	}
+
 	movies, err := getMovies(ctx, tx)
 	if err != nil {
 		return err
@@ -59,7 +63,8 @@ func Run(db *sql.DB) error {
 	schedule := buildSchedule(movies, screens, time.Now(), 30)
 
 	for _, show := range schedule {
-		_, err := tx.ExecContext(ctx, `
+		_, err := tx.ExecContext(
+			ctx, `
 			INSERT INTO showtimes (
 				movie_id,
 				screen_id,
@@ -94,6 +99,30 @@ func Run(db *sql.DB) error {
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("committing seed transaction: %w", err)
+	}
+
+	return nil
+}
+
+func seedMovies(ctx context.Context, tx *sql.Tx) error {
+	movies := []struct {
+		title    string
+		duration int
+	}{
+		{"Interstellar", 169},
+		{"Dune", 155},
+		{"The Dark Knight", 152},
+	}
+
+	for _, m := range movies {
+		_, err := tx.ExecContext(ctx, `
+            INSERT INTO movies (title, duration_minutes)
+            VALUES ($1, $2)
+            ON CONFLICT DO NOTHING
+        `, m.title, m.duration)
+		if err != nil {
+			return fmt.Errorf("seeding movie %q: %w", m.title, err)
+		}
 	}
 
 	return nil
@@ -268,6 +297,7 @@ func seedSeats(ctx context.Context, tx *sql.Tx, screens []screen) error {
 
 	return nil
 }
+
 func seedShowtimeSeats(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO showtime_seats (showtime_id, seat_id, status)

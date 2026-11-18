@@ -13,29 +13,23 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-
 		log.Fatal(err)
-
 	}
 	println("server initiated")
 }
 
 func run() error {
-
 	// loading .env confs
 
 	if err := godotenv.Load(); err != nil {
-		return fmt.Errorf("loading env: %w", err)
+		log.Println("No .env file found; using environment variables")
 	}
 
 	//  postgress
 
 	database, err := db.Connect()
-
 	if err != nil {
-
 		return fmt.Errorf("connecting to database: %w", err)
-
 	}
 	defer database.Close()
 
@@ -53,5 +47,4 @@ func run() error {
 	srv.Mount()
 
 	return srv.Run()
-
 }

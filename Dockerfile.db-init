@@ -1,0 +1,37 @@
+
+# Stage 1: Build the migration CLI and Go seeder
+FROM golang:1.27 AS builder
+
+WORKDIR /app
+
+# Copy Go dependency manifests
+COPY go.mod go.sum ./
+
+RUN go mod download
+
+# Install migration CLI with PostgreSQL support
+RUN go install -tags 'postgres' \
+    github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+# Copy application source and migration files
+COPY . .
+
+# Compile the seeder
+RUN CGO_ENABLED=0 go build -o /seed ./cmd/seed
+
+
+# Stage 2: Runtime image
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+# Copy executables from builder
+COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
+COPY --from=builder /seed /app/seed
+
+# Copy SQL migration files
+COPY migrations/ /app/migrations/
+
+# Run migrations, then seed the database
+CMD ["sh", "-c", "migrate -path /app/migrations -database \"$DATABASE_URL\" up && /app/seed"]
+
