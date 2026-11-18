@@ -1,0 +1,81 @@
+name: Movie Booking CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: movie
+          POSTGRES_PASSWORD: movie
+          POSTGRES_DB: moviebooking
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U movie -d moviebooking"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://movie:movie@localhost:5432/moviebooking?sslmode=disable
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install migration CLI
+        run: |
+          go install -tags 'postgres' \
+            github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+      - name: Run database migrations
+        run: migrate -path migrations -database "$DATABASE_URL" up
+
+      - name: Seed database
+        run: go run ./cmd/seed
+
+      - name: Run Go tests
+        run: go test ./...
+
+      - name: Build Go backend
+        run: go build ./cmd/api
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build backend Docker image
+        run: docker build -t movie-booking-backend -f Dockerfile .
+
+      - name: Build database initialization image
+        run: docker build -t movie-booking-db-init -f Dockerfile.db-init .
+
+      - name: Build frontend Docker image
+        run: docker build -t movie-booking-frontend -f Dockerfile.frontend .
