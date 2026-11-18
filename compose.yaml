@@ -1,0 +1,64 @@
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: movie
+      POSTGRES_PASSWORD: movie
+      POSTGRES_DB: moviebooking
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks:
+      - movie-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U movie -d moviebooking"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Runs migrations and seeds initial data
+  db-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.db-init
+    environment:
+      DATABASE_URL: postgres://movie:movie@db:5432/moviebooking?sslmode=disable
+    networks:
+      - movie-network
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:3000"
+    environment:
+      DATABASE_URL: postgres://movie:movie@db:5432/moviebooking?sslmode=disable
+    networks:
+      - movie-network
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "8080:80"
+    networks:
+      - movie-network
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+
+networks:
+  movie-network:
+    driver: bridge

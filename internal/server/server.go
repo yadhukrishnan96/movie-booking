@@ -18,11 +18,10 @@ type Server struct {
 }
 
 func NewServer(movieHandler *movie.Handler, bookingHandler *booking.Handler) *Server {
-
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"http://localhost:5173"},
+		AllowedOrigins: []string{"http://localhost:8080"},
 		AllowedMethods: []string{
 			"GET",
 			"POST",
@@ -66,17 +65,17 @@ func (s *Server) Mount() {
 	)
 
 	s.router.Post(
-		"/showtimes/{showtimeID}/seats/{seatID}/hold",
+		"/showtimes/{showtimeID}/seats/hold",
 		s.bookingHandler.HoldSeat,
 	)
 
 	s.router.Post(
-		"/showtimes/{showtimeID}/seats/{seatID}/confirm",
+		"/showtimes/{showtimeID}/seats/confirm",
 		s.bookingHandler.ConfirmSeat,
 	)
 
 	s.router.Post(
-		"/showtimes/{showtimeID}/seats/{seatID}/release",
+		"/showtimes/{showtimeID}/seats/release",
 		s.bookingHandler.ReleaseSeat,
 	)
 

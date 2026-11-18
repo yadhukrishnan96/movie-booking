@@ -14,21 +14,22 @@ var (
 
 type SeatHold struct {
 	HoldID    string    `json:"hold_id"`
+	SeatIDs   []int64   `json:"seat_ids"`
 	ExpiresAt time.Time `json:"expires_at"`
 }
 type Store interface {
 	MarkSeatBooked(ctx context.Context, showtimeID, seatID int64) error
-	HoldSeat(ctx context.Context, showtimeID, seatID int64) (SeatHold, error)
+	HoldSeats(ctx context.Context, showtimeID int64, seatIDs []int64) (SeatHold, error)
 
-	ConfirmSeat(
+	ConfirmSeats(
 		ctx context.Context,
-		showtimeID, seatID int64,
+		showtimeID int64, seatIDs []int64,
 		holdID string,
 	) error
 
-	ReleaseSeat(
+	ReleaseSeats(
 		ctx context.Context,
-		showtimeID, seatID int64,
+		showtimeID int64, seatIDs []int64,
 		holdID string,
 	) error
 }
@@ -54,37 +55,51 @@ func (s *Service) BookSeat(
 	return s.store.MarkSeatBooked(ctx, showtimeID, seatID)
 }
 
-func (s *Service) HoldSeat(
+func (s *Service) HoldSeats(
 	ctx context.Context,
-	showtimeID, seatID int64,
+	showtimeID int64,
+	seatIDs []int64,
 ) (SeatHold, error) {
-	if showtimeID <= 0 || seatID <= 0 {
+	if showtimeID <= 0 || len(seatIDs) == 0 {
 		return SeatHold{}, ErrInvalidBooking
 	}
 
-	return s.store.HoldSeat(ctx, showtimeID, seatID)
+	seen := make(map[int64]struct{}, len(seatIDs))
+	for _, seatID := range seatIDs {
+		if seatID <= 0 {
+			return SeatHold{}, ErrInvalidBooking
+		}
+		if _, exists := seen[seatID]; exists {
+			return SeatHold{}, ErrInvalidBooking
+		}
+		seen[seatID] = struct{}{}
+	}
+
+	return s.store.HoldSeats(ctx, showtimeID, seatIDs)
 }
 
-func (s *Service) ConfirmSeat(
+func (s *Service) ConfirmSeats(
 	ctx context.Context,
-	showtimeID, seatID int64,
+	showtimeID int64,
+	seatIDs []int64,
 	holdID string,
 ) error {
-	if showtimeID <= 0 || seatID <= 0 || holdID == "" {
+	if showtimeID <= 0 || len(seatIDs) == 0 || holdID == "" {
 		return ErrInvalidBooking
 	}
 
-	return s.store.ConfirmSeat(ctx, showtimeID, seatID, holdID)
+	return s.store.ConfirmSeats(ctx, showtimeID, seatIDs, holdID)
 }
 
-func (s *Service) ReleaseSeat(
+func (s *Service) ReleaseSeats(
 	ctx context.Context,
-	showtimeID, seatID int64,
+	showtimeID int64,
+	seatIDs []int64,
 	holdID string,
 ) error {
-	if showtimeID <= 0 || seatID <= 0 || holdID == "" {
+	if showtimeID <= 0 || len(seatIDs) == 0 || holdID == "" {
 		return ErrInvalidBooking
 	}
 
-	return s.store.ReleaseSeat(ctx, showtimeID, seatID, holdID)
+	return s.store.ReleaseSeats(ctx, showtimeID, seatIDs, holdID)
 }
